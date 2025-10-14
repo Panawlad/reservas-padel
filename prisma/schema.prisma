@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  password     String?
+  name         String?
+  role         Role           @default(USER)
+  wallet       String?        @unique
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  clubs        Club[]         @relation("OwnerClubs")
+  reservations Reservation[]
+}
+
+model Club {
+  id            String         @id @default(uuid())
+  name          String
+  description   String?
+  address       String?
+  city          String?
+  zone          String?
+  lat           Float?
+  lng           Float?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  isActive      Boolean        @default(true)
+
+  owner         User?          @relation("OwnerClubs", fields: [ownerId], references: [id])
+  ownerId       String?
+
+  courts        Court[]
+  schedules     Schedule[]
+  timeslots     Timeslot[]
+  reservations  Reservation[]
+  commissions   Commission[]   // ✅ relación inversa añadida
+}
+
+model Court {
+  id           String          @id @default(uuid())
+  name         String
+  surface      String?
+  indoor       Boolean         @default(false)
+  basePrice    Int             // en centavos (MXN)
+  currency     String          @default("MXN")
+  isActive     Boolean         @default(true)
+  club         Club            @relation(fields: [clubId], references: [id])
+  clubId       String
+
+  timeslots    Timeslot[]
+  reservations Reservation[]
+  schedules    Schedule[]      // ✅ relación inversa añadida
+}
+
+model Schedule {
+  id            String    @id @default(uuid())
+  weekday       Int       // 0=Domingo ... 6=Sábado
+  openTime      String    // formato HH:mm
+  closeTime     String
+  slotMinutes   Int       @default(60)
+  priceOverride Int?
+  isActive      Boolean   @default(true)
+
+  club          Club      @relation(fields: [clubId], references: [id])
+  clubId        String
+  court         Court?    @relation(fields: [courtId], references: [id])
+  courtId       String?
+}
+
+model Timeslot {
+  id          String           @id @default(uuid())
+  date        DateTime
+  startTime   String
+  endTime     String
+  priceCents  Int
+  currency    String           @default("MXN")
+  status      TimeslotStatus   @default(AVAILABLE)
+
+  club        Club             @relation(fields: [clubId], references: [id])
+  clubId      String
+  court       Court            @relation(fields: [courtId], references: [id])
+  courtId     String
+
+  reservation Reservation?
+}
+
+model Reservation {
+  id             String            @id @default(uuid())
+  totalCents     Int
+  currency       String            @default("MXN")
+  status         ReservationStatus @default(PENDING)
+  qrCode         String?
+  createdAt      DateTime          @default(now())
+
+  user           User              @relation(fields: [userId], references: [id])
+  userId         String
+  club           Club              @relation(fields: [clubId], references: [id])
+  clubId         String
+  court          Court             @relation(fields: [courtId], references: [id])
+  courtId        String
+  timeslot       Timeslot          @relation(fields: [timeslotId], references: [id])
+  timeslotId     String            @unique
+  paymentMethod  String?           @default("USDC")
+
+  payment        Payment?
+}
+
+
+model Payment {
+  id            String          @id @default(uuid())
+  method        PaymentMethod
+  amountCents   Int
+  currency      String
+  provider      String?
+  providerRef   String?
+  status        PaymentStatus    @default(PENDING)
+  network       String?
+  usdcAmount    Float?
+  createdAt     DateTime         @default(now())
+
+  reservation   Reservation      @relation(fields: [reservationId], references: [id])
+  reservationId String           @unique
+}
+
+
+model Commission {
+  id             String     @id @default(uuid())
+  platformFeeBps Int        @default(1000) // 10% = 1000 basis points
+  effectiveFrom  DateTime   @default(now())
+
+  club           Club?      @relation(fields: [clubId], references: [id])
+  clubId         String?
+}
+
+enum Role {
+  USER
+  CLUB
+  ADMIN
+}
+
+enum TimeslotStatus {
+  AVAILABLE
+  HELD
+  RESERVED
+}
+
+enum ReservationStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+enum PaymentMethod {
+  FIAT
+  USDC
+}
