@@ -15,12 +15,23 @@ const wallets = [new PhantomWalletAdapter()];
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="es">
-      <body className="min-h-screen bg-black text-white">
+      <body className="min-h-screen" style={{ 
+        background: 'linear-gradient(135deg, var(--beige-50) 0%, var(--cream) 100%)',
+        color: 'var(--dark-brown)'
+      }}>
         <ConnectionProvider endpoint="https://api.devnet.solana.com">
           <WalletProvider wallets={wallets} autoConnect>
             <WalletModalProvider>
               {children}
-              <ToastContainer position="bottom-right" theme="dark" />
+              <ToastContainer 
+                position="bottom-right" 
+                theme="light"
+                toastStyle={{
+                  background: 'var(--warm-white)',
+                  color: 'var(--dark-brown)',
+                  border: '1px solid var(--beige-200)'
+                }}
+              />
             </WalletModalProvider>
           </WalletProvider>
         </ConnectionProvider>

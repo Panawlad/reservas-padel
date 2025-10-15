@@ -83,14 +83,24 @@ export const getClubById = async (req: Request, res: Response) => {
 
     const club = await prisma.club.findUnique({
       where: { id },
-      include: { owner: true },
+      include: { 
+        owner: true,
+        courts: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            name: true,
+            surface: true,
+            basePrice: true,
+            isActive: true,
+            currency: true,
+            indoor: true,
+          },
+        },
+      },
     });
 
     if (!club) return res.status(404).json({ error: "Club no encontrado" });
-
-    if (club.ownerId !== userId && (req as any).role !== "ADMIN") {
-      return res.status(403).json({ error: "No tienes acceso a este club" });
-    }
 
     res.json(club);
   } catch (error) {
@@ -128,6 +138,45 @@ export const updateClub = async (req: Request, res: Response) => {
 };
 
 /**
+ * Obtener el club del usuario actual (solo CLUB)
+ */
+export const getMyClub = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+
+    const club = await prisma.club.findFirst({
+      where: { 
+        ownerId: userId,
+        isActive: true 
+      },
+      include: {
+        courts: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            name: true,
+            surface: true,
+            basePrice: true,
+            isActive: true,
+            currency: true,
+            indoor: true,
+          },
+        },
+      },
+    });
+
+    if (!club) {
+      return res.status(404).json({ error: "No tienes un club registrado" });
+    }
+
+    res.json(club);
+  } catch (error) {
+    console.error("Error en getMyClub:", error);
+    res.status(500).json({ error: "Error al obtener el club" });
+  }
+};
+
+/**
  * Desactivar (soft delete) un club (solo ADMIN)
  */
 export const deactivateClub = async (req: Request, res: Response) => {
@@ -143,5 +192,71 @@ export const deactivateClub = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error en deactivateClub:", error);
     res.status(500).json({ error: "Error al desactivar el club" });
+  }
+};
+
+/**
+ * Obtener estadísticas de ingresos del club
+ */
+export const getClubEarnings = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { startDate, endDate } = req.query;
+
+    // Obtener el club del usuario
+    const club = await prisma.club.findFirst({
+      where: { ownerId: userId },
+    });
+
+    if (!club) {
+      return res.status(404).json({ error: "Club no encontrado para este usuario." });
+    }
+
+    const whereClause: any = {
+      clubId: club.id,
+      status: 'PAID',
+    };
+
+    if (startDate && endDate) {
+      whereClause.createdAt = {
+        gte: new Date(startDate as string),
+        lte: new Date(endDate as string),
+      };
+    }
+
+    const stats = await prisma.reservation.aggregate({
+      where: whereClause,
+      _sum: {
+        totalCents: true,
+        platformFeeCents: true,
+        clubFeeCents: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const totalRevenue = stats._sum.totalCents || 0;
+    const platformRevenue = stats._sum.platformFeeCents || 0;
+    const clubRevenue = stats._sum.clubFeeCents || 0;
+    const totalReservations = stats._count.id || 0;
+
+    res.json({
+      club: {
+        id: club.id,
+        name: club.name,
+        city: club.city,
+        zone: club.zone,
+      },
+      totalRevenue,
+      platformRevenue,
+      clubRevenue,
+      totalReservations,
+      averageReservationValue: totalReservations > 0 ? Math.round(totalRevenue / totalReservations) : 0,
+      platformPercentage: totalRevenue > 0 ? Math.round((platformRevenue / totalRevenue) * 100) : 0,
+    });
+  } catch (error) {
+    console.error("Error obteniendo estadísticas del club:", error);
+    res.status(500).json({ error: "Error obteniendo estadísticas del club" });
   }
 };

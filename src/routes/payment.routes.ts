@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { verifyToken } from "../middleware/auth.middleware";
-import { prepareUSDC, confirmUSDC } from "../controllers/payment.controller";
+import { prepareUSDC, confirmUSDC, getAllPayments } from "../controllers/payment.controller";
 
 const router = Router();
 
@@ -15,5 +15,10 @@ router.post("/prepare", verifyToken, prepareUSDC);
  * Body: { reservationId: string, signature: string }
  */
 router.post("/confirm", verifyToken, confirmUSDC);
+
+/**
+ * 🔹 Obtener todos los pagos
+ */
+router.get("/", getAllPayments);
 
 export default router;

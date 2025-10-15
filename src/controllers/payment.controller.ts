@@ -38,7 +38,7 @@ export const prepareUSDC = async (req: Request, res: Response) => {
     const usdcAmount = reservation.totalCents / 100 / 18;
     const reference = uuidv4();
 
-    // Crear registro de pago pendiente
+    // Crear registro de pago pendiente con división automática
     const payment = await prisma.payment.create({
       data: {
         reservationId,
@@ -48,6 +48,9 @@ export const prepareUSDC = async (req: Request, res: Response) => {
         provider: "solana",
         providerRef: reference, // UUID temporal hasta que se confirme
         status: "PENDING",
+        // Campos de división automática
+        platformFeeCents: reservation.platformFeeCents,
+        clubFeeCents: reservation.clubFeeCents,
         network: "devnet",
         usdcAmount,
       },
@@ -126,6 +129,12 @@ export const confirmUSDC = async (req: Request, res: Response) => {
       data: { status: "PAID" },
     });
 
+    // Al confirmar el pago, bloquear definitivamente el horario
+    await prisma.timeslot.update({
+      where: { id: reservation.timeslotId },
+      data: { status: "RESERVED" },
+    });
+
     res.json({
       message: "Pago USDC confirmado exitosamente.",
       reservationId,
@@ -134,5 +143,27 @@ export const confirmUSDC = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error en confirmUSDC:", error);
     res.status(500).json({ error: "Error al confirmar el pago." });
+  }
+};
+
+export const getAllPayments = async (req: Request, res: Response) => {
+  try {
+    const payments = await prisma.payment.findMany({
+      include: {
+        reservation: {
+          include: {
+            user: true,
+            club: true,
+            court: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(payments);
+  } catch (error) {
+    console.error("Error en getAllPayments:", error);
+    res.status(500).json({ error: "Error al obtener pagos" });
   }
 };

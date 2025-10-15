@@ -43,6 +43,7 @@ model Club {
   timeslots     Timeslot[]
   reservations  Reservation[]
   commissions   Commission[]   // ✅ relación inversa añadida
+  images        ClubImage[]    // ✅ imágenes del club
 }
 
 model Court {
@@ -59,6 +60,7 @@ model Court {
   timeslots    Timeslot[]
   reservations Reservation[]
   schedules    Schedule[]      // ✅ relación inversa añadida
+  images       CourtImage[]    // ✅ imágenes de la cancha
 }
 
 model Schedule {
@@ -101,6 +103,11 @@ model Reservation {
   qrCode         String?
   createdAt      DateTime          @default(now())
 
+  // Campos de comisión
+  platformFeeCents Int            @default(0) // Comisión de la plataforma
+  clubFeeCents     Int            @default(0) // Pago al club
+  commissionId      String?        // Referencia a la comisión aplicada
+
   user           User              @relation(fields: [userId], references: [id])
   userId         String
   club           Club              @relation(fields: [clubId], references: [id])
@@ -112,6 +119,7 @@ model Reservation {
   paymentMethod  String?           @default("USDC")
 
   payment        Payment?
+  commission     Commission?       @relation(fields: [commissionId], references: [id])
 }
 
 
@@ -127,6 +135,10 @@ model Payment {
   usdcAmount    Float?
   createdAt     DateTime         @default(now())
 
+  // Campos de división automática
+  platformFeeCents Int         @default(0) // Comisión de la plataforma
+  clubFeeCents     Int         @default(0) // Pago al club
+
   reservation   Reservation      @relation(fields: [reservationId], references: [id])
   reservationId String           @unique
 }
@@ -135,10 +147,15 @@ model Payment {
 model Commission {
   id             String     @id @default(uuid())
   platformFeeBps Int        @default(1000) // 10% = 1000 basis points
+  clubFeeBps     Int        @default(9000)  // 90% = 9000 basis points
   effectiveFrom  DateTime   @default(now())
+  isActive       Boolean    @default(true)
 
   club           Club?      @relation(fields: [clubId], references: [id])
   clubId         String?
+  
+  // Relación con reservas para calcular comisiones
+  reservations   Reservation[]
 }
 
 enum Role {
@@ -168,4 +185,37 @@ enum PaymentStatus {
 enum PaymentMethod {
   FIAT
   USDC
+}
+
+// ✅ Modelos para imágenes
+model ClubImage {
+  id          String    @id @default(uuid())
+  url         String    // URL de la imagen en Supabase Storage
+  alt         String?   // Texto alternativo para accesibilidad
+  isPrimary   Boolean   @default(false) // Imagen principal del club
+  orderIndex  Int       @default(0) // Orden de visualización
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  club        Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  clubId      String
+
+  @@index([clubId])
+  @@index([clubId, isPrimary])
+}
+
+model CourtImage {
+  id          String    @id @default(uuid())
+  url         String    // URL de la imagen en Supabase Storage
+  alt         String?   // Texto alternativo para accesibilidad
+  isPrimary   Boolean   @default(false) // Imagen principal de la cancha
+  orderIndex  Int       @default(0) // Orden de visualización
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  court       Court     @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  courtId     String
+
+  @@index([courtId])
+  @@index([courtId, isPrimary])
 }

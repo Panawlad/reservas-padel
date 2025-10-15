@@ -7,6 +7,8 @@ import {
   getClubById,
   updateClub,
   deactivateClub,
+  getMyClub,
+  getClubEarnings,
 } from "../controllers/club.controller";
 
 const router = Router();
@@ -17,7 +19,13 @@ router.post("/create", verifyToken, authorizeRoles("ADMIN"), createClub);
 // ✅ Ver todos los clubes → solo ADMIN
 router.get("/", verifyToken, getAllClubs);
 
-// ✅ Ver un club específico → ADMIN o CLUB propietario
+// ✅ Ver mi club → solo CLUB
+router.get("/my-club", verifyToken, authorizeRoles("CLUB"), getMyClub);
+
+// ✅ Estadísticas de ingresos del club → solo CLUB
+router.get("/earnings", verifyToken, authorizeRoles("CLUB"), getClubEarnings);
+
+// ✅ Ver un club específico → Cualquier usuario autenticado
 router.get("/:id", verifyToken, getClubById);
 
 // ✅ Actualizar club → ADMIN o CLUB propietario

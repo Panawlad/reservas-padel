@@ -54,9 +54,9 @@ export default function PayUSDCButton({ reservationId, token }: PayUSDCButtonPro
     <button
       onClick={handlePay}
       disabled={loading}
-      className="px-5 py-3 rounded-lg bg-green-600 hover:bg-green-700 transition font-semibold text-white"
+      className="px-6 py-3 rounded-xl beige-success font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
     >
-      {loading ? "Procesando..." : "Pagar con USDC (Solana)"}
+      {loading ? "⏳ Procesando..." : "💰 Pagar con USDC (Solana)"}
     </button>
   );
 }

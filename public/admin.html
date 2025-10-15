@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administración - Reservas Pádel</title>
+    <link rel="stylesheet" href="/admin.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-tennis-ball"></i> Admin Pádel</h2>
+            </div>
+            <ul class="sidebar-menu">
+                <li class="menu-item active" data-section="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </li>
+                <li class="menu-item" data-section="clubs">
+                    <i class="fas fa-building"></i>
+                    <span>Clubes</span>
+                </li>
+                <li class="menu-item" data-section="courts">
+                    <i class="fas fa-table-tennis"></i>
+                    <span>Canchas</span>
+                </li>
+                <li class="menu-item" data-section="reservations">
+                    <i class="fas fa-calendar-check"></i>
+                    <span>Reservas</span>
+                </li>
+                <li class="menu-item" data-section="users">
+                    <i class="fas fa-users"></i>
+                    <span>Usuarios</span>
+                </li>
+                <li class="menu-item" data-section="payments">
+                    <i class="fas fa-credit-card"></i>
+                    <span>Pagos</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1 id="page-title">Dashboard</h1>
+                    <p id="page-subtitle">Panel de administración del sistema</p>
+                </div>
+                <div class="header-right">
+                    <div class="user-info">
+                        <i class="fas fa-user-circle"></i>
+                        <span>Administrador</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="content-section active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-building"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="total-clubs">0</h3>
+                            <p>Clubes Activos</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-table-tennis"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="total-courts">0</h3>
+                            <p>Canchas</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="total-reservations">0</h3>
+                            <p>Reservas Hoy</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="total-revenue">$0</h3>
+                            <p>Ingresos Hoy</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="chart-container">
+                        <h3>Reservas por Día</h3>
+                        <canvas id="reservations-chart"></canvas>
+                    </div>
+                    <div class="recent-activity">
+                        <h3>Actividad Reciente</h3>
+                        <div id="recent-activity-list">
+                            <div class="activity-item">
+                                <i class="fas fa-plus-circle"></i>
+                                <div class="activity-content">
+                                    <p>Nueva reserva creada</p>
+                                    <small>Hace 5 minutos</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Clubs Section -->
+            <section id="clubs" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Clubes</h2>
+                    <button class="btn btn-primary" onclick="showAddClubModal()">
+                        <i class="fas fa-plus"></i> Nuevo Club
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Dirección</th>
+                                <th>Ciudad</th>
+                                <th>Propietario</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clubs-table-body">
+                            <!-- Clubs will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Courts Section -->
+            <section id="courts" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Canchas</h2>
+                    <button class="btn btn-primary" onclick="showAddCourtModal()">
+                        <i class="fas fa-plus"></i> Nueva Cancha
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Club</th>
+                                <th>Superficie</th>
+                                <th>Precio Base</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="courts-table-body">
+                            <!-- Courts will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Reservations Section -->
+            <section id="reservations" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Reservas</h2>
+                    <div class="filter-controls">
+                        <select id="reservation-filter">
+                            <option value="all">Todas</option>
+                            <option value="pending">Pendientes</option>
+                            <option value="paid">Pagadas</option>
+                            <option value="cancelled">Canceladas</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Club</th>
+                                <th>Cancha</th>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Total</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reservations-table-body">
+                            <!-- Reservations will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Users Section -->
+            <section id="users" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Usuarios</h2>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Email</th>
+                                <th>Rol</th>
+                                <th>Wallet</th>
+                                <th>Fecha Registro</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <!-- Users will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Payments Section -->
+            <section id="payments" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Pagos</h2>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Método</th>
+                                <th>Monto</th>
+                                <th>Moneda</th>
+                                <th>Estado</th>
+                                <th>Red</th>
+                                <th>Fecha</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payments-table-body">
+                            <!-- Payments will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="add-club-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nuevo Club</h3>
+                <span class="close" onclick="closeModal('add-club-modal')">&times;</span>
+            </div>
+            <form id="add-club-form">
+                <div class="form-group">
+                    <label for="club-name">Nombre</label>
+                    <input type="text" id="club-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="club-description">Descripción</label>
+                    <textarea id="club-description" name="description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="club-address">Dirección</label>
+                    <input type="text" id="club-address" name="address">
+                </div>
+                <div class="form-group">
+                    <label for="club-city">Ciudad</label>
+                    <input type="text" id="club-city" name="city">
+                </div>
+                <div class="form-group">
+                    <label for="club-zone">Zona</label>
+                    <input type="text" id="club-zone" name="zone">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-club-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Club</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="add-court-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Nueva Cancha</h3>
+                <span class="close" onclick="closeModal('add-court-modal')">&times;</span>
+            </div>
+            <form id="add-court-form">
+                <div class="form-group">
+                    <label for="court-name">Nombre</label>
+                    <input type="text" id="court-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="court-club">Club</label>
+                    <select id="court-club" name="clubId" required>
+                        <option value="">Seleccionar club</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="court-surface">Superficie</label>
+                    <input type="text" id="court-surface" name="surface">
+                </div>
+                <div class="form-group">
+                    <label for="court-price">Precio Base (centavos)</label>
+                    <input type="number" id="court-price" name="basePrice" required>
+                </div>
+                <div class="form-group">
+                    <label for="court-indoor">Cubierta</label>
+                    <input type="checkbox" id="court-indoor" name="indoor">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-court-modal')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Cancha</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/admin.js"></script>
+</body>
+</html>

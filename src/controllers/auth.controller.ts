@@ -81,3 +81,39 @@ export const login = async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Error interno del servidor" });
   }
 };
+
+export const me = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId as string;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true, createdAt: true }
+    });
+    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+    return res.json(user);
+  } catch (error) {
+    console.error("Error en me:", error);
+    return res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+export const getAllUsers = async (req: Request, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        wallet: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(users);
+  } catch (error) {
+    console.error("Error en getAllUsers:", error);
+    res.status(500).json({ error: "Error al obtener usuarios" });
+  }
+};

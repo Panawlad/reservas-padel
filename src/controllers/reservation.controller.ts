@@ -30,7 +30,19 @@ export const createReservation = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "El horario no está disponible." });
     }
 
-    // Crear reserva
+    // Calcular comisiones automáticamente
+    const commission = await prisma.commission.findFirst({
+      where: { isActive: true },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+
+    const platformFeeBps = commission?.platformFeeBps || 1000; // 10%
+    const clubFeeBps = commission?.clubFeeBps || 9000; // 90%
+
+    const platformFeeCents = Math.round((timeslot.priceCents * platformFeeBps) / 10000);
+    const clubFeeCents = timeslot.priceCents - platformFeeCents;
+
+    // Crear reserva (no bloquear el horario todavía)
     const reservation = await prisma.reservation.create({
       data: {
         userId,
@@ -41,17 +53,14 @@ export const createReservation = async (req: Request, res: Response) => {
         currency: timeslot.currency,
         paymentMethod: paymentMethod || "FIAT",
         status: "PENDING",
+        platformFeeCents,
+        clubFeeCents,
+        commissionId: commission?.id,
       },
       include: {
         court: true,
         timeslot: true,
       },
-    });
-
-    // Cambiar el estado del horario a RESERVED
-    await prisma.timeslot.update({
-      where: { id: timeslotId },
-      data: { status: "RESERVED" },
     });
 
     res.status(201).json({
@@ -83,6 +92,12 @@ export const confirmReservation = async (req: Request, res: Response) => {
     const updated = await prisma.reservation.update({
       where: { id: reservationId },
       data: { status: "PAID" },
+    });
+
+    // Asegurar que el horario quede reservado al confirmar manualmente
+    await prisma.timeslot.update({
+      where: { id: updated.timeslotId },
+      data: { status: "RESERVED" },
     });
 
     res.json({
