@@ -1,6 +1,10 @@
+import dotenv from "dotenv";
+
+// Cargar variables de entorno ANTES de importar otros módulos
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "path";
 import { prisma } from "./db";
 import authRoutes from "./routes/auth.routes";
@@ -11,8 +15,6 @@ import timeslotRoutes from "./routes/timeslot.routes";
 import reservationRoutes from "./routes/reservation.routes";
 import paymentRoutes from "./routes/payment.routes";
 import commissionRoutes from "./routes/commission.routes";
-
-dotenv.config();
 
 const app = express();
 app.use(cors());

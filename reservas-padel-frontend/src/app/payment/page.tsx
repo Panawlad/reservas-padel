@@ -158,7 +158,7 @@ export default function PaymentPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen relative overflow-hidden bg-gradient-to-r from-pink-400 via-purple-500 to-blue-500 flex items-center justify-center">
+      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 flex items-center justify-center">
         <div className="text-center text-white">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
           <p className="mt-4">Cargando información de pago...</p>
@@ -169,7 +169,7 @@ export default function PaymentPage() {
 
   if (success) {
     return (
-      <main className="min-h-screen relative overflow-hidden bg-gradient-to-r from-pink-400 via-purple-500 to-blue-500 flex flex-col items-center justify-center p-6">
+      <main className="min-h-screen relative overflow-hidden bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 flex flex-col items-center justify-center p-6">
         {/* Background decorative elements */}
         <div
           aria-hidden
@@ -210,19 +210,27 @@ export default function PaymentPage() {
             </div>
           )}
 
-          <button
-            onClick={() => router.push("/reservations")}
-            className="w-full py-3 rounded-xl bg-white/20 backdrop-blur-sm text-white border border-white/30 font-semibold text-lg transition-all duration-300 hover:bg-white/30 hover:scale-105"
-          >
-            📅 Ver mis reservas
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => router.push("/reservations")}
+              className="w-full py-3 rounded-xl bg-white/20 backdrop-blur-sm text-white border border-white/30 font-semibold text-lg transition-all duration-300 hover:bg-white/30 hover:scale-105"
+            >
+              📅 Ver mis reservas
+            </button>
+            <button
+              onClick={() => router.push("/home")}
+              className="w-full px-4 py-2 bg-white/20 backdrop-blur-sm text-white border border-white/30 text-sm font-semibold rounded-lg hover:bg-white/30 transition-colors"
+            >
+              ← Volver al Inicio
+            </button>
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen relative overflow-hidden bg-gradient-to-r from-pink-400 via-purple-500 to-blue-500 flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen relative overflow-hidden bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500 flex flex-col items-center justify-center p-6">
       {/* Background decorative elements */}
       <div
         aria-hidden
@@ -288,12 +296,14 @@ export default function PaymentPage() {
           )}
         </div>
 
-        <button
-          onClick={() => router.push("/home")}
-          className="mt-6 w-full text-sm text-white/80 hover:text-white transition-colors duration-300"
-        >
-          ← Volver
-        </button>
+        <div className="mt-6 space-y-3">
+          <button
+            onClick={() => router.push("/home")}
+            className="w-full px-4 py-2 bg-white/20 backdrop-blur-sm text-white border border-white/30 text-sm font-semibold rounded-lg hover:bg-white/30 transition-colors"
+          >
+            ← Volver al Inicio
+          </button>
+        </div>
       </div>
     </main>
   );

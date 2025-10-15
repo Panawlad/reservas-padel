@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../db";
+import { uploadImageToSupabase } from "../lib/supabase";
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Crear un nuevo club (solo ADMIN)
@@ -38,6 +40,53 @@ export const createClub = async (req: Request, res: Response) => {
 };
 
 /**
+ * Crear un nuevo club para usuario CLUB (auto-asignado)
+ */
+export const createMyClub = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { name, description, address, city, zone, lat, lng } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "El nombre del club es obligatorio" });
+    }
+
+    // Verificar que el usuario no tenga ya un club
+    const existingClub = await prisma.club.findFirst({
+      where: { 
+        ownerId: userId,
+        isActive: true 
+      }
+    });
+
+    if (existingClub) {
+      return res.status(400).json({ error: "Ya tienes un club registrado" });
+    }
+
+    const club = await prisma.club.create({
+      data: {
+        name,
+        description,
+        address,
+        city,
+        zone,
+        lat,
+        lng,
+        ownerId: userId,
+      },
+      include: {
+        courts: true
+      }
+    });
+
+    res.status(201).json(club);
+  } catch (error) {
+    console.error("Error en createMyClub:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+/**
  * Obtener todos los clubes (visible para ADMIN)
  */
 /**
@@ -61,6 +110,9 @@ export const getAllClubs = async (_req: Request, res: Response) => {
             basePrice: true,
             isActive: true,
           },
+        },
+        images: {
+          orderBy: { orderIndex: 'asc' }
         },
       },
       orderBy: { name: "asc" },
@@ -96,6 +148,9 @@ export const getClubById = async (req: Request, res: Response) => {
             currency: true,
             indoor: true,
           },
+        },
+        images: {
+          orderBy: { orderIndex: 'asc' }
         },
       },
     });
@@ -161,6 +216,9 @@ export const getMyClub = async (req: Request, res: Response) => {
             currency: true,
             indoor: true,
           },
+        },
+        images: {
+          orderBy: { orderIndex: 'asc' }
         },
       },
     });
@@ -258,5 +316,97 @@ export const getClubEarnings = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error obteniendo estadísticas del club:", error);
     res.status(500).json({ error: "Error obteniendo estadísticas del club" });
+  }
+};
+
+/**
+ * Subir imágenes del club
+ */
+export const uploadClubImages = async (req: Request, res: Response) => {
+  try {
+    const { clubId } = req.params;
+    const userId = (req as any).userId;
+    const role = (req as any).role;
+
+    // Verificar que el usuario tenga acceso al club
+    const club = await prisma.club.findUnique({
+      where: { id: clubId },
+    });
+
+    if (!club) {
+      return res.status(404).json({ error: "Club no encontrado" });
+    }
+
+    if (role !== "ADMIN" && club.ownerId !== userId) {
+      return res.status(403).json({ error: "No tienes permiso para subir imágenes a este club" });
+    }
+
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "No se han proporcionado archivos de imagen" });
+    }
+
+    const uploadedImages = [];
+
+    for (const file of files) {
+      try {
+        const fileExtension = file.originalname.split('.').pop();
+        const fileName = `${uuidv4()}.${fileExtension}`;
+        const filePath = `club_images/${clubId}/${fileName}`;
+
+        // Subir imagen a Supabase Storage
+        console.log("Subiendo imagen a Supabase:", {
+          bucket: 'padel-images',
+          filePath,
+          mimetype: file.mimetype,
+          size: file.buffer.length
+        });
+        
+        const publicUrl = await uploadImageToSupabase(
+          'padel-images', // Nombre del bucket
+          filePath,
+          file.buffer,
+          file.mimetype
+        );
+        
+        console.log("Imagen subida exitosamente:", publicUrl);
+
+        // Guardar en la base de datos
+        const newClubImage = await prisma.clubImage.create({
+          data: {
+            url: publicUrl,
+            alt: `Imagen de ${club.name}`,
+            clubId: club.id,
+          },
+        });
+
+        uploadedImages.push(newClubImage);
+      } catch (uploadError) {
+        console.error("Error subiendo imagen:", uploadError);
+        return res.status(500).json({ 
+          error: "Error al subir una de las imágenes", 
+          details: uploadError instanceof Error ? uploadError.message : "Error desconocido"
+        });
+      }
+    }
+
+    res.status(201).json({ 
+      message: "Imágenes subidas exitosamente", 
+      images: uploadedImages 
+    });
+  } catch (error) {
+    console.error("Error en uploadClubImages:", error);
+    if (error instanceof Error) {
+      res.status(500).json({ 
+        error: "Error interno del servidor al subir imágenes", 
+        details: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        error: "Error interno del servidor al subir imágenes", 
+        details: "Error desconocido" 
+      });
+    }
   }
 };

@@ -120,38 +120,77 @@ export const getAvailableTimeslots = async (req: Request, res: Response) => {
 export const getTimeslotsByCourt = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { date } = req.query; // Fecha opcional, por defecto hoy
+
+    console.log("🔍 Obteniendo timeslots para cancha:", id, "fecha:", date);
 
     const court = await prisma.court.findUnique({
       where: { id },
-      select: { id: true, name: true },
+      include: { 
+        club: true,
+        schedules: {
+          where: { isActive: true },
+          orderBy: { weekday: 'asc' }
+        }
+      },
     });
 
     if (!court) return res.status(404).json({ error: "Cancha no encontrada" });
 
-    const timeslots = await prisma.timeslot.findMany({
-      where: { courtId: id },
-      orderBy: [{ date: "asc" }, { startTime: "asc" }],
-      select: {
-        id: true,
-        date: true,
-        startTime: true,
-        endTime: true,
-        status: true,
-        priceCents: true,
-        currency: true,
-      },
-    });
+    console.log("📅 Schedules encontrados:", court.schedules.length);
 
-    if (timeslots.length === 0)
-      return res
-        .status(404)
-        .json({ message: "No hay horarios generados para esta cancha" });
+    // Si no hay schedules, devolver array vacío
+    if (court.schedules.length === 0) {
+      console.log("⚠️ No hay schedules activos para esta cancha");
+      return res.json({ timeslots: [] });
+    }
 
-    res.json({
-      court,
-      total: timeslots.length,
-      timeslots,
-    });
+    // Generar timeslots dinámicamente basados en los schedules
+    const targetDate = date ? new Date(date as string) : new Date();
+    const weekday = targetDate.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+    
+    console.log("📅 Fecha objetivo:", targetDate.toISOString().split('T')[0]);
+    console.log("📅 Día de la semana:", weekday);
+
+    // Buscar schedule para el día de la semana
+    const schedule = court.schedules.find(s => s.weekday === weekday);
+    
+    if (!schedule) {
+      console.log("⚠️ No hay schedule para el día", weekday);
+      return res.json({ timeslots: [] });
+    }
+
+    console.log("✅ Schedule encontrado:", schedule);
+
+    // Generar timeslots basados en el schedule
+    const timeslots = [];
+    const startTime = new Date(`2000-01-01T${schedule.openTime}`);
+    const endTime = new Date(`2000-01-01T${schedule.closeTime}`);
+    const slotDuration = schedule.slotMinutes;
+
+    let currentTime = new Date(startTime);
+    
+    while (currentTime < endTime) {
+      const slotEnd = new Date(currentTime.getTime() + slotDuration * 60000);
+      
+      if (slotEnd <= endTime) {
+        const price = schedule.priceOverride || court.basePrice;
+        
+        timeslots.push({
+          id: `generated-${court.id}-${currentTime.getTime()}`,
+          startTime: currentTime.toTimeString().slice(0, 5),
+          endTime: slotEnd.toTimeString().slice(0, 5),
+          status: "AVAILABLE",
+          priceCents: Math.round(price * 100), // Convertir a centavos
+          currency: court.currency || "MXN"
+        });
+      }
+      
+      currentTime = new Date(currentTime.getTime() + slotDuration * 60000);
+    }
+
+    console.log("🎯 Timeslots generados:", timeslots.length);
+    res.json({ timeslots });
   } catch (error) {
     console.error("Error en getTimeslotsByCourt:", error);
     res.status(500).json({ error: "Error al obtener los horarios de la cancha" });

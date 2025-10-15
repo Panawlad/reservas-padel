@@ -16,6 +16,14 @@ interface Court {
   indoor: boolean;
 }
 
+interface ClubImage {
+  id: string;
+  url: string;
+  alt?: string;
+  isPrimary: boolean;
+  orderIndex: number;
+}
+
 interface Club {
   id: string;
   name: string;
@@ -23,31 +31,29 @@ interface Club {
   city: string;
   zone: string;
   courts: Court[];
+  images: ClubImage[];
 }
 
 export default function ClubDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   
   const resolvedParams = use(params);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") ?? "" : "";
 
   useEffect(() => {
-    if (!token) {
-      router.push("/auth");
-      return;
-    }
-
     loadClubData();
-  }, [resolvedParams.id, token, router]);
+  }, [resolvedParams.id]);
 
   const loadClubData = async () => {
     try {
-      const { data } = await axios.get(`${API_URL}/clubs/${resolvedParams.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      console.log("🔄 Cargando datos del club público:", resolvedParams.id);
+      const { data } = await axios.get(`${API_URL}/clubs/public/${resolvedParams.id}`);
+      console.log("📊 Datos del club público recibidos:", data);
+      console.log("🖼️ Imágenes del club público:", data.images);
       setClub(data);
     } catch (err) {
       console.error("Error cargando datos del club:", err);
@@ -55,6 +61,33 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
       setLoading(false);
     }
   };
+
+  const nextImage = () => {
+    if (club?.images && club.images.length > 0) {
+      setCurrentImageIndex((prev) => (prev + 1) % club.images.length);
+    }
+  };
+
+  const prevImage = () => {
+    if (club?.images && club.images.length > 0) {
+      setCurrentImageIndex((prev) => (prev - 1 + club.images.length) % club.images.length);
+    }
+  };
+
+  const goToImage = (index: number) => {
+    setCurrentImageIndex(index);
+  };
+
+  // Auto-play del carrusel (opcional)
+  useEffect(() => {
+    if (club?.images && club.images.length > 1) {
+      const interval = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % club.images.length);
+      }, 5000); // Cambiar imagen cada 5 segundos
+
+      return () => clearInterval(interval);
+    }
+  }, [club?.images]);
 
   if (loading) {
     return (
@@ -117,6 +150,84 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
       </header>
 
       <div className="px-4 space-y-8">
+        {/* Club Images Carousel */}
+        {console.log("🔍 Verificando imágenes del club:", club?.images)}
+        {console.log("🔍 Club existe:", !!club)}
+        {console.log("🔍 Club images length:", club?.images?.length)}
+        {club?.images && club.images.length > 0 ? (
+          <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
+            <h2 className="text-3xl font-bold text-white mb-6 text-center">
+              📸 Galería del Club
+            </h2>
+            
+            <div className="relative">
+              {/* Main Image */}
+              <div className="relative w-full h-96 rounded-xl overflow-hidden mb-4">
+                <img
+                  src={club.images[currentImageIndex]?.url}
+                  alt={club.images[currentImageIndex]?.alt || `Imagen ${currentImageIndex + 1} de ${club.name}`}
+                  className="w-full h-full object-cover"
+                />
+                
+                {/* Navigation Arrows */}
+                {club.images.length > 1 && (
+                  <>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70 transition-colors"
+                    >
+                      →
+                    </button>
+                  </>
+                )}
+                
+                {/* Image Counter */}
+                <div className="absolute bottom-4 right-4 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                  {currentImageIndex + 1} / {club.images.length}
+                </div>
+              </div>
+              
+              {/* Thumbnail Navigation */}
+              {club.images.length > 1 && (
+                <div className="flex gap-2 justify-center overflow-x-auto pb-2">
+                  {club.images.map((image, index) => (
+                    <button
+                      key={image.id}
+                      onClick={() => goToImage(index)}
+                      className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                        index === currentImageIndex
+                          ? 'border-white scale-110'
+                          : 'border-white/30 hover:border-white/60'
+                      }`}
+                    >
+                      <img
+                        src={image.url}
+                        alt={image.alt || `Miniatura ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Fallback cuando no hay imágenes */
+          <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
+            <div className="text-center text-white/60">
+              <div className="text-6xl mb-4">📸</div>
+              <p className="text-xl">No hay imágenes disponibles</p>
+              <p className="text-sm">El club aún no ha subido imágenes</p>
+            </div>
+          </div>
+        )}
+
         {/* Club Description */}
         <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
           <div className="text-center">
@@ -129,21 +240,6 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {/* Image Slider Placeholder */}
-        <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
-          <h3 className="text-2xl font-bold text-white mb-6 text-center">
-            Galería del Club
-          </h3>
-          <div className="relative w-full h-80 bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center text-white/60">
-                <div className="text-6xl mb-4">🏓</div>
-                <p className="text-xl">Imágenes del club</p>
-                <p className="text-sm">(Slider de imágenes aquí)</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Courts Section */}
         <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
@@ -194,20 +290,17 @@ export default function ClubDetailPage({ params }: { params: Promise<{ id: strin
                     <span className="text-sm font-normal text-white/70">/hora</span>
                   </div>
                   
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm text-white/70">
-                      <span>💡 Iluminación LED</span>
-                      <span>✅ Disponible</span>
+                  {/* Solo mostrar información real proporcionada por el usuario */}
+                  {court.amenities && court.amenities.length > 0 && (
+                    <div className="space-y-2">
+                      {court.amenities.map((amenity, index) => (
+                        <div key={index} className="flex items-center justify-between text-sm text-white/70">
+                          <span>{amenity.name}</span>
+                          <span>✅ {amenity.included ? 'Incluido' : 'Disponible'}</span>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex items-center justify-between text-sm text-white/70">
-                      <span>🚿 Vestuarios</span>
-                      <span>✅ Incluido</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-white/70">
-                      <span>🅿️ Parking</span>
-                      <span>✅ Gratuito</span>
-                    </div>
-                  </div>
+                  )}
 
                   <button
                     onClick={() => router.push(`/courts/${court.id}`)}

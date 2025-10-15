@@ -72,15 +72,31 @@ export const useAuth = () => {
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setAuthState({
-      user: null,
-      token: null,
-      isLoading: false,
-      isAuthenticated: false,
-    });
-    router.push("/");
+    try {
+      // Limpiar localStorage
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("userProfile");
+      
+      // Actualizar estado
+      setAuthState({
+        user: null,
+        token: null,
+        isLoading: false,
+        isAuthenticated: false,
+      });
+      
+      // Redirigir a la página principal
+      router.push("/");
+      
+      // Forzar recarga para asegurar que el estado se actualice
+      window.location.reload();
+    } catch (error) {
+      console.error("Error during logout:", error);
+      // En caso de error, forzar limpieza
+      localStorage.clear();
+      window.location.href = "/";
+    }
   };
 
   const hasRole = (role: "USER" | "CLUB" | "ADMIN") => {

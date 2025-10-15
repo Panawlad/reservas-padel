@@ -6,6 +6,14 @@ import { useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+interface ClubImage {
+  id: string;
+  url: string;
+  alt?: string;
+  isPrimary: boolean;
+  orderIndex: number;
+}
+
 interface Club {
   id: string;
   name: string;
@@ -19,6 +27,7 @@ interface Club {
     basePrice: number;
     isActive: boolean;
   }[];
+  images: ClubImage[];
 }
 
 export default function HomePage() {
@@ -37,9 +46,11 @@ export default function HomePage() {
 
     const loadClubs = async () => {
       try {
-        const { data } = await axios.get(`${API_URL}/clubs`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        console.log("🔄 Cargando clubes disponibles...");
+        const { data } = await axios.get(`${API_URL}/clubs/public`);
+        console.log("📊 Clubes recibidos:", data);
+        console.log("🔢 Cantidad de clubes:", data.length);
+        console.log("🖼️ Imágenes del primer club:", data[0]?.images);
         setClubs(data);
       } catch (err) {
         console.error("Error cargando clubes:", err);
@@ -187,16 +198,31 @@ export default function HomePage() {
 
             {/* Club Image Gallery */}
             <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
-              {/* Image Slider Placeholder */}
-              <div className="relative w-full h-64 bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center text-white/60">
-                    <div className="text-4xl mb-2">🏓</div>
-                    <p className="text-lg">Imágenes del club</p>
-                    <p className="text-sm">(Slider de imágenes aquí)</p>
+              {/* Club Images */}
+              {club.images && club.images.length > 0 ? (
+                <div className="relative w-full h-64 bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
+                  <img
+                    src={club.images[0].url}
+                    alt={club.images[0].alt || `Imagen de ${club.name}`}
+                    className="w-full h-full object-cover"
+                  />
+                  {club.images.length > 1 && (
+                    <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded-full text-sm">
+                      +{club.images.length - 1} más
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="relative w-full h-64 bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden mb-6">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center text-white/60">
+                      <div className="text-4xl mb-2">🏓</div>
+                      <p className="text-lg">Imágenes del club</p>
+                      <p className="text-sm">(Slider de imágenes aquí)</p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               
               {/* Action Button */}
               <div className="text-center">

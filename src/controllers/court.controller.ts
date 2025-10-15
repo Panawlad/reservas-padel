@@ -33,6 +33,7 @@ export const createCourt = async (req: Request, res: Response) => {
         surface,
         indoor: indoor || false,
         basePrice: basePrice || 0,
+        isActive: true, // ✅ Crear canchas como activas por defecto
         clubId,
       },
     });

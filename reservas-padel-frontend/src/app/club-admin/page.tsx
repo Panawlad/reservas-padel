@@ -32,6 +32,14 @@ function ClubAdminPage() {
   const [loading, setLoading] = useState(true);
   const [editingCourt, setEditingCourt] = useState<Court | null>(null);
   const [showAddCourt, setShowAddCourt] = useState(false);
+  const [newCourtData, setNewCourtData] = useState({
+    name: "",
+    surface: "Sintética",
+    basePrice: 50000,
+    indoor: false
+  });
+  const [courtImage, setCourtImage] = useState<File | null>(null);
+  const [clubImages, setClubImages] = useState<File[]>([]);
 
   const token = typeof window !== "undefined" ? localStorage.getItem("token") ?? "" : "";
 
@@ -50,7 +58,28 @@ function ClubAdminPage() {
       const { data } = await axios.get(`${API_URL}/clubs/my-club`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setClub(data);
+      
+      console.log("📊 Datos del club recibidos:", data);
+      console.log("🖼️ Imágenes del club:", data.images);
+      
+      // ✅ Asegurar que las canchas tengan todos los campos necesarios
+      const clubWithCourts = {
+        ...data,
+        courts: data.courts.map((court: any) => ({
+          id: court.id,
+          name: court.name,
+          surface: court.surface || "Sintética",
+          basePrice: court.basePrice || 0,
+          isActive: court.isActive !== undefined ? court.isActive : true,
+          currency: court.currency || "MXN",
+          indoor: court.indoor || false
+        })),
+        images: data.images || []
+      };
+      
+      console.log("🏢 Club configurado con imágenes:", clubWithCourts.images);
+      
+      setClub(clubWithCourts);
     } catch (err) {
       console.error("Error cargando datos del club:", err);
     } finally {
@@ -65,9 +94,42 @@ function ClubAdminPage() {
       });
       setClub({ ...club!, ...updatedData });
       alert("Club actualizado exitosamente");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error actualizando club:", err);
-      alert("Error al actualizar el club");
+      console.error("Error details:", err.response?.data);
+      console.error("Error status:", err.response?.status);
+      alert(`Error al actualizar el club: ${err.response?.data?.error || err.message || "Error desconocido"}`);
+    }
+  };
+
+  const handleUploadClubImages = async () => {
+    if (!club || clubImages.length === 0) {
+      alert("Por favor selecciona al menos una imagen para subir.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      clubImages.forEach((file) => {
+        formData.append("clubImages", file);
+      });
+
+      const { data } = await axios.post(`${API_URL}/clubs/${club.id}/images`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      alert("Imágenes del club subidas exitosamente.");
+      setClubImages([]);
+      await loadClubData(); // Recargar datos del club para mostrar las nuevas imágenes
+    } catch (err: any) {
+      console.error("Error subiendo imágenes del club:", err);
+      alert(`Error al subir imágenes del club: ${err.response?.data?.error || err.message || "Error desconocido"}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -88,23 +150,46 @@ function ClubAdminPage() {
     }
   };
 
-  const handleAddCourt = async (courtData: Omit<Court, 'id'>) => {
+  const handleAddCourt = async () => {
+    if (!newCourtData.name) {
+      alert("El nombre de la cancha es obligatorio");
+      return;
+    }
+
     try {
-      const { data } = await axios.post(`${API_URL}/courts`, {
-        ...courtData,
+      const { data } = await axios.post(`${API_URL}/courts/create`, {
+        ...newCourtData,
         clubId: club?.id
       }, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      // ✅ Agregar la nueva cancha con todos los campos necesarios
+      const newCourt = {
+        id: data.court.id,
+        name: data.court.name,
+        surface: data.court.surface,
+        basePrice: data.court.basePrice,
+        isActive: data.court.isActive,
+        currency: data.court.currency || "MXN",
+        indoor: data.court.indoor
+      };
+      
       setClub({
         ...club!,
-        courts: [...club!.courts, data]
+        courts: [...club!.courts, newCourt]
       });
       setShowAddCourt(false);
+      setNewCourtData({
+        name: "",
+        surface: "Sintética",
+        basePrice: 50000,
+        indoor: false
+      });
       alert("Cancha agregada exitosamente");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error agregando cancha:", err);
-      alert("Error al agregar la cancha");
+      alert(err.response?.data?.error || "Error al agregar la cancha");
     }
   };
 
@@ -120,20 +205,7 @@ function ClubAdminPage() {
   }
 
   if (!club) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-pink-400 via-purple-500 to-blue-500">
-        <div className="text-center text-white">
-          <h2 className="text-2xl font-bold mb-4">No tienes un club registrado</h2>
-          <p className="mb-6">Contacta al administrador para registrar tu club</p>
-          <button
-            onClick={() => router.push("/home")}
-            className="px-6 py-3 bg-white/20 backdrop-blur-sm text-white border border-white/30 rounded-lg hover:bg-white/30 transition-colors"
-          >
-            Volver al inicio
-          </button>
-        </div>
-      </div>
-    );
+    return <CreateClubForm onClubCreated={setClub} />;
   }
 
   return (
@@ -227,6 +299,61 @@ function ClubAdminPage() {
           </button>
         </div>
 
+        {/* Fotos del Club */}
+        <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
+          <h2 className="text-3xl font-bold text-white mb-6">📸 Fotos del Club</h2>
+          
+          <div className="mb-6">
+            <label className="block text-white font-semibold mb-2">Subir Fotos del Club</label>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => setClubImages(Array.from(e.target.files || []))}
+              className="w-full p-3 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-white/20 file:text-white hover:file:bg-white/30"
+            />
+            {clubImages.length > 0 && (
+              <p className="text-white/70 text-sm mt-2">
+                {clubImages.length} foto(s) seleccionada(s)
+              </p>
+            )}
+          </div>
+          
+          <button
+            onClick={handleUploadClubImages}
+            disabled={loading || clubImages.length === 0}
+            className="px-6 py-3 bg-white/20 backdrop-blur-sm text-white border border-white/30 font-semibold rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Subiendo..." : `Subir ${clubImages.length} Foto(s)`}
+          </button>
+
+          {/* Mostrar imágenes existentes */}
+          {club?.images && club.images.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-xl font-bold text-white mb-4">Imágenes del Club</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {club.images.map((image) => (
+                  <div key={image.id} className="relative group">
+                    <img
+                      src={image.url}
+                      alt={image.alt || "Imagen del club"}
+                      className="w-full h-32 object-cover rounded-lg border border-white/30"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                      <button
+                        onClick={() => alert("Funcionalidad de eliminar imagen en desarrollo")}
+                        className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Courts Management */}
         <div className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8">
           <div className="flex justify-between items-center mb-6">
@@ -244,12 +371,29 @@ function ClubAdminPage() {
               <div key={court.id} className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-6">
                 <div className="flex justify-between items-start mb-4">
                   <h3 className="text-xl font-bold text-white">{court.name}</h3>
-                  <button
-                    onClick={() => setEditingCourt(court)}
-                    className="text-white/70 hover:text-white"
-                  >
-                    ✏️
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => alert("Funcionalidad de subir fotos de cancha en desarrollo")}
+                      className="text-white/70 hover:text-white text-sm"
+                      title="Subir fotos"
+                    >
+                      📸
+                    </button>
+                    <button
+                      onClick={() => router.push(`/club-admin/schedule/${court.id}`)}
+                      className="text-white/70 hover:text-white text-sm"
+                      title="Configurar horarios"
+                    >
+                      ⏰
+                    </button>
+                    <button
+                      onClick={() => setEditingCourt(court)}
+                      className="text-white/70 hover:text-white"
+                      title="Editar cancha"
+                    >
+                      ✏️
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="space-y-3">
@@ -372,17 +516,24 @@ function ClubAdminPage() {
             
             <div className="space-y-4">
               <div>
-                <label className="block text-white font-semibold mb-2">Nombre</label>
+                <label className="block text-white font-semibold mb-2">Nombre *</label>
                 <input
                   type="text"
+                  value={newCourtData.name}
+                  onChange={(e) => setNewCourtData({...newCourtData, name: e.target.value})}
                   placeholder="Ej: Cancha 1"
                   className="w-full p-3 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 placeholder-white/50"
+                  required
                 />
               </div>
               
               <div>
                 <label className="block text-white font-semibold mb-2">Superficie</label>
-                <select className="w-full p-3 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30">
+                <select 
+                  value={newCourtData.surface}
+                  onChange={(e) => setNewCourtData({...newCourtData, surface: e.target.value})}
+                  className="w-full p-3 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30"
+                >
                   <option value="Sintética">Sintética</option>
                   <option value="Césped">Césped</option>
                   <option value="Cristal">Cristal</option>
@@ -393,6 +544,8 @@ function ClubAdminPage() {
                 <label className="block text-white font-semibold mb-2">Precio por hora (centavos)</label>
                 <input
                   type="number"
+                  value={newCourtData.basePrice}
+                  onChange={(e) => setNewCourtData({...newCourtData, basePrice: parseInt(e.target.value) || 0})}
                   placeholder="50000"
                   className="w-full p-3 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 placeholder-white/50"
                 />
@@ -402,21 +555,46 @@ function ClubAdminPage() {
                 <input
                   type="checkbox"
                   id="indoorNew"
+                  checked={newCourtData.indoor}
+                  onChange={(e) => setNewCourtData({...newCourtData, indoor: e.target.checked})}
                   className="w-4 h-4"
                 />
                 <label htmlFor="indoorNew" className="text-white">Cancha interior</label>
+              </div>
+              
+              <div>
+                <label className="block text-white font-semibold mb-2">Imagen de la Cancha</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setCourtImage(e.target.files?.[0] || null)}
+                  className="w-full p-3 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-white/20 file:text-white hover:file:bg-white/30"
+                />
+                {courtImage && (
+                  <p className="text-white/70 text-sm mt-2">
+                    Imagen seleccionada: {courtImage.name}
+                  </p>
+                )}
               </div>
             </div>
             
             <div className="flex gap-4 mt-6">
               <button
-                onClick={() => setShowAddCourt(false)}
+                onClick={handleAddCourt}
                 className="flex-1 px-6 py-3 bg-white/20 backdrop-blur-sm text-white border border-white/30 font-semibold rounded-lg hover:bg-white/30 transition-colors"
               >
                 Agregar
               </button>
               <button
-                onClick={() => setShowAddCourt(false)}
+                onClick={() => {
+                  setShowAddCourt(false);
+                  setNewCourtData({
+                    name: "",
+                    surface: "Sintética",
+                    basePrice: 50000,
+                    indoor: false
+                  });
+                }}
                 className="flex-1 px-6 py-3 bg-red-500/20 backdrop-blur-sm text-red-200 border border-red-300/30 font-semibold rounded-lg hover:bg-red-500/30 transition-colors"
               >
                 Cancelar
@@ -426,6 +604,147 @@ function ClubAdminPage() {
         </div>
       )}
     </main>
+  );
+}
+
+// Componente para crear un nuevo club
+function CreateClubForm({ onClubCreated }: { onClubCreated: (club: Club) => void }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    city: "",
+    zone: "",
+    address: ""
+  });
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") ?? "" : "";
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.city || !formData.zone) {
+      alert("Por favor completa todos los campos obligatorios");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data } = await axios.post(`${API_URL}/clubs`, formData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      onClubCreated(data);
+      alert("¡Club creado exitosamente! 🎉");
+    } catch (err: any) {
+      console.error("Error creando club:", err);
+      alert(err.response?.data?.error || "Error al crear el club");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-pink-400 via-purple-500 to-blue-500">
+      <div className="w-full max-w-2xl bg-white/20 backdrop-blur-sm border border-white/30 rounded-2xl p-8 mx-4">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-white mb-4">
+            🏢 Crear tu Club
+          </h1>
+          <p className="text-lg text-white/80">
+            Configura la información básica de tu club de pádel
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-white font-semibold mb-2">
+                Nombre del Club *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                className="w-full p-4 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 placeholder-white/50"
+                placeholder="Ej: Club Pádel Central"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-white font-semibold mb-2">
+                Ciudad *
+              </label>
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => setFormData({...formData, city: e.target.value})}
+                className="w-full p-4 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 placeholder-white/50"
+                placeholder="Ej: Ciudad de México"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-white font-semibold mb-2">
+                Zona *
+              </label>
+              <input
+                type="text"
+                value={formData.zone}
+                onChange={(e) => setFormData({...formData, zone: e.target.value})}
+                className="w-full p-4 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 placeholder-white/50"
+                placeholder="Ej: Del Valle, Polanco, Santa Fe"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-white font-semibold mb-2">
+                Dirección
+              </label>
+              <input
+                type="text"
+                value={formData.address}
+                onChange={(e) => setFormData({...formData, address: e.target.value})}
+                className="w-full p-4 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 placeholder-white/50"
+                placeholder="Ej: Av. Insurgentes Sur 123"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-white font-semibold mb-2">
+              Descripción del Club
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              rows={4}
+              className="w-full p-4 rounded-lg bg-white/20 backdrop-blur-sm text-white border border-white/30 placeholder-white/50 resize-none"
+              placeholder="Describe las características especiales de tu club, servicios, amenidades, etc."
+            />
+          </div>
+
+          <div className="flex gap-4 pt-4">
+            <button
+              type="button"
+              onClick={() => router.push("/home")}
+              className="flex-1 px-6 py-4 bg-red-500/20 backdrop-blur-sm text-red-200 border border-red-300/30 font-semibold rounded-lg hover:bg-red-500/30 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-6 py-4 bg-white/20 backdrop-blur-sm text-white border border-white/30 font-semibold rounded-lg hover:bg-white/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? "Creando Club..." : "Crear Club"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
