@@ -55,24 +55,33 @@ function PaymentPageContent() {
 
   const loadReservation = async () => {
     try {
-      // Simulación de datos de reserva (puedes conectar tu backend)
+      setLoading(true);
+      const { data } = await axios.get(
+        `${API_URL}/reservations/${reservationId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
       setReservation({
-        id: reservationId!,
-        status: "PENDING",
-        totalCents: 5000, // $50.00
-        currency: "MXN",
+        id: data.id,
+        status: data.status,
+        totalCents: data.totalCents,
+        currency: data.currency,
         timeslot: {
-          startTime: "10:00",
-          endTime: "11:00",
+          startTime: data.timeslot?.startTime || "",
+          endTime: data.timeslot?.endTime || "",
         },
         court: {
-          name: "Cancha 1",
-          club: { name: "Club Pádel" },
+          name: data.court?.name || "",
+          club: { name: data.court?.club?.name || "" },
         },
       });
       setLoading(false);
     } catch (error) {
       console.error("Error cargando reserva:", error);
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        // Si no se encuentra la reserva, redirigir
+        router.push("/home");
+      }
       setLoading(false);
     }
   };

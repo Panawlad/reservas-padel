@@ -5,6 +5,7 @@ import {
   generateTimeslots,
   getAvailableTimeslots,
   getTimeslotsByCourt,
+  getTimeslotById,
 } from "../controllers/timeslot.controller";
 
 const router = Router();
@@ -17,5 +18,8 @@ router.get("/", verifyToken, getAvailableTimeslots);
 
 // ✅ Obtener los horarios de una cancha específica
 router.get("/court/:id", verifyToken, getTimeslotsByCourt);
+
+// ✅ Obtener un timeslot específico por ID (maneja tanto reales como generados)
+router.get("/:id", verifyToken, getTimeslotById);
 
 export default router;

@@ -5,6 +5,7 @@ import {
   confirmReservation,
   cancelReservation,
   getUserReservations,
+  getReservationById,
 } from "../controllers/reservation.controller";
 
 const router = Router();
@@ -32,5 +33,11 @@ router.post("/cancel", verifyToken, cancelReservation);
  * Headers: Authorization: Bearer <token>
  */
 router.get("/my", verifyToken, getUserReservations);
+
+/**
+ * 🔹 Obtener una reserva específica por ID
+ * Headers: Authorization: Bearer <token>
+ */
+router.get("/:id", verifyToken, getReservationById);
 
 export default router;

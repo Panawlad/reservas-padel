@@ -174,14 +174,15 @@ export const getTimeslotsByCourt = async (req: Request, res: Response) => {
       const slotEnd = new Date(currentTime.getTime() + slotDuration * 60000);
       
       if (slotEnd <= endTime) {
-        const price = schedule.priceOverride || court.basePrice;
+        // basePrice y priceOverride ya están en centavos según el schema
+        const priceCents = schedule.priceOverride ?? court.basePrice;
         
         timeslots.push({
           id: `generated-${court.id}-${currentTime.getTime()}`,
           startTime: currentTime.toTimeString().slice(0, 5),
           endTime: slotEnd.toTimeString().slice(0, 5),
           status: "AVAILABLE",
-          priceCents: Math.round(price * 100), // Convertir a centavos
+          priceCents: priceCents, // Ya está en centavos
           currency: court.currency || "MXN"
         });
       }
@@ -194,5 +195,183 @@ export const getTimeslotsByCourt = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error en getTimeslotsByCourt:", error);
     res.status(500).json({ error: "Error al obtener los horarios de la cancha" });
+  }
+};
+
+/**
+ * ✅ Obtener un timeslot por ID
+ * Maneja tanto timeslots reales (de BD) como generados dinámicamente
+ */
+export const getTimeslotById = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Si es un timeslot generado dinámicamente (formato: generated-{courtId}-{timestamp})
+    if (id.startsWith('generated-')) {
+      // El courtId puede ser un UUID, así que necesitamos extraerlo diferente
+      // Formato: generated-{courtId}-{timestamp}
+      const lastDashIndex = id.lastIndexOf('-');
+      const timestampPart = id.substring(lastDashIndex + 1);
+      const courtIdPart = id.substring('generated-'.length, lastDashIndex);
+      
+      const courtId = courtIdPart;
+      const timestamp = parseInt(timestampPart);
+
+      if (!courtId || isNaN(timestamp)) {
+        return res.status(400).json({ error: "ID de timeslot generado inválido" });
+      }
+
+      // Obtener la cancha y su información
+      const court = await prisma.court.findUnique({
+        where: { id: courtId },
+        include: { 
+          club: true,
+          schedules: {
+            where: { isActive: true },
+            orderBy: { weekday: 'asc' }
+          }
+        },
+      });
+
+      if (!court) {
+        return res.status(404).json({ error: "Cancha no encontrada" });
+      }
+
+      // Extraer la hora del timestamp (el timestamp es relativo a 2000-01-01)
+      const baseDate = new Date(`2000-01-01T00:00:00`);
+      const slotTimeFromBase = new Date(timestamp);
+      const hours = slotTimeFromBase.getHours();
+      const minutes = slotTimeFromBase.getMinutes();
+      
+      // Obtener la fecha real (de query param o usar hoy)
+      const { date } = req.query;
+      const targetDate = date ? new Date(date as string) : new Date();
+      targetDate.setHours(0, 0, 0, 0);
+      const weekday = targetDate.getDay();
+
+      // Buscar schedule para ese día
+      const schedule = court.schedules.find(s => s.weekday === weekday);
+      
+      if (!schedule) {
+        return res.status(404).json({ error: "No hay horario configurado para este día" });
+      }
+
+      // Reconstruir el timeslot con la fecha correcta
+      const startTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      const slotDuration = schedule.slotMinutes;
+      const [startHour, startMin] = startTime.split(':').map(Number);
+      const slotStart = new Date(targetDate);
+      slotStart.setHours(startHour, startMin, 0, 0);
+      const slotEnd = new Date(slotStart.getTime() + slotDuration * 60000);
+      const endTime = `${slotEnd.getHours().toString().padStart(2, '0')}:${slotEnd.getMinutes().toString().padStart(2, '0')}`;
+
+      // basePrice y priceOverride ya están en centavos según el schema
+      const priceCents = schedule.priceOverride ?? court.basePrice;
+
+      // Verificar si existe un timeslot real para esta fecha y hora
+      const existingTimeslot = await prisma.timeslot.findFirst({
+        where: {
+          courtId: court.id,
+          date: targetDate,
+          startTime: startTime,
+        },
+        include: {
+          court: {
+            include: {
+              club: true
+            }
+          }
+        }
+      });
+
+      // Si existe un timeslot real, usarlo
+      if (existingTimeslot) {
+        return res.json({
+          id: existingTimeslot.id,
+          date: existingTimeslot.date.toISOString().split('T')[0],
+          startTime: existingTimeslot.startTime,
+          endTime: existingTimeslot.endTime,
+          priceCents: existingTimeslot.priceCents,
+          currency: existingTimeslot.currency,
+          status: existingTimeslot.status,
+          court: {
+            id: existingTimeslot.court.id,
+            name: existingTimeslot.court.name,
+            surface: existingTimeslot.court.surface,
+            indoor: existingTimeslot.court.indoor,
+            club: {
+              id: existingTimeslot.court.club.id,
+              name: existingTimeslot.court.club.name,
+              city: existingTimeslot.court.club.city,
+              zone: existingTimeslot.court.club.zone,
+            }
+          }
+        });
+      }
+
+      // Si no existe, devolver el generado
+      return res.json({
+        id: id,
+        date: targetDate.toISOString().split('T')[0],
+        startTime: startTime,
+        endTime: endTime,
+        priceCents: priceCents, // Ya está en centavos
+        currency: court.currency || "MXN",
+        status: "AVAILABLE",
+        court: {
+          id: court.id,
+          name: court.name,
+          surface: court.surface,
+          indoor: court.indoor,
+          club: {
+            id: court.club.id,
+            name: court.club.name,
+            city: court.club.city,
+            zone: court.club.zone,
+          }
+        }
+      });
+    }
+
+    // Si es un timeslot real (UUID normal)
+    const timeslot = await prisma.timeslot.findUnique({
+      where: { id },
+      include: {
+        court: {
+          include: {
+            club: true
+          }
+        }
+      }
+    });
+
+    if (!timeslot) {
+      return res.status(404).json({ error: "Horario no encontrado" });
+    }
+
+    res.json({
+      id: timeslot.id,
+      date: timeslot.date.toISOString().split('T')[0],
+      startTime: timeslot.startTime,
+      endTime: timeslot.endTime,
+      priceCents: timeslot.priceCents,
+      currency: timeslot.currency,
+      status: timeslot.status,
+      court: {
+        id: timeslot.court.id,
+        name: timeslot.court.name,
+        surface: timeslot.court.surface,
+        indoor: timeslot.court.indoor,
+        club: {
+          id: timeslot.court.club.id,
+          name: timeslot.court.club.name,
+          city: timeslot.court.club.city,
+          zone: timeslot.court.club.zone,
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error en getTimeslotById:", error);
+    res.status(500).json({ error: "Error al obtener el horario" });
   }
 };
